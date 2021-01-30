@@ -1,33 +1,35 @@
-#include 	"sm.h"
+#include "sm.h"
+#include <stdio.h>
 
 sm_event_t sm_reserved_event[] =
-{
-	{ SM_EMPTY_SIG, 0 },
-	{ SM_ENTRY_SIG, 0 },
-	{ SM_EXIT_SIG,  0 },
-	{ SM_INIT_SIG,  0 },
-	{ SM_USER_SIG,  0 },
+	{
+		{SM_EMPTY_SIG, SM_NULL},
+		{SM_ENTRY_SIG, SM_NULL},
+		{SM_EXIT_SIG, SM_NULL},
+		{SM_INIT_SIG, SM_NULL},
+		{SM_USER_SIG, SM_NULL},
 };
-
 
 #if CONFIG_SM_FSM
 void fsm_ctor(sm_t *me, sm_state_handler_t init)
 {
-	SM_ASSERT(0 != me);
-	SM_ASSERT(0 != init);
+	SM_ASSERT(SM_NULL != me);
+	SM_ASSERT(SM_NULL != init);
 
-	me->state = 0;
-	me->temp  = init;
+	me->state = SM_NULL;
+	me->temp = init;
 }
-sm_ret_t  fsm_init(sm_t *me, sm_event_t *e)
+
+sm_ret_t fsm_init(sm_t *me, sm_event_t *e)
 {
 	sm_ret_t ret;
 
-	SM_ASSERT(0 != me);
-	SM_ASSERT(0 != me->temp);
+	SM_ASSERT(SM_NULL != me);
+	SM_ASSERT(SM_NULL != me->temp);
 
 	ret = (me->temp)(me, e);
-	if(ret != SM_RET_TRAN)
+
+	if (ret != SM_RET_TRAN)
 	{
 		return ret;
 	}
@@ -38,6 +40,7 @@ sm_ret_t  fsm_init(sm_t *me, sm_event_t *e)
 
 	return ret;
 }
+
 void fsm_dispatch(sm_t *me, sm_event_t *e)
 {
 	sm_ret_t ret;
@@ -45,7 +48,8 @@ void fsm_dispatch(sm_t *me, sm_event_t *e)
 	SM_ASSERT(me->state == me->temp);
 
 	ret = (me->temp)(me, e);
-	if(SM_RET_TRAN == ret)
+
+	if (SM_RET_TRAN == ret)
 	{
 		SM_EXIT(me, me->state);
 		SM_ENTRY(me, me->temp);
@@ -67,16 +71,16 @@ sm_ret_t hsm_top(sm_t *me, const sm_event_t *e)
 }
 
 static unsigned char hsm_find_path(sm_t *me,
-						sm_state_handler_t t,
-						sm_state_handler_t s,
-						sm_state_handler_t path[SM_MAX_NEST_DEPTH])
+								   sm_state_handler_t t,
+								   sm_state_handler_t s,
+								   sm_state_handler_t path[SM_MAX_NEST_DEPTH])
 {
 	signed char ip = -1;
 	signed char iq;
 	sm_ret_t ret;
 
 	/* (a) check source==target (transition to self) */
-	if( s == t)
+	if (s == t)
 	{
 		SM_EXIT(me, s);
 		ip = 0;
@@ -88,7 +92,7 @@ static unsigned char hsm_find_path(sm_t *me,
 	t = me->temp;
 
 	/* (b) check source==target->super */
-	if( s == t )
+	if (s == t)
 	{
 		ip = 0;
 		goto hsm_find_path_end;
@@ -97,7 +101,7 @@ static unsigned char hsm_find_path(sm_t *me,
 	SM_TRIG(me, s, SM_EMPTY_SIG);
 
 	/* (c) check source->super==target->super */
-	if(me->temp == t)
+	if (me->temp == t)
 	{
 		SM_EXIT(me, s);
 		ip = 0;
@@ -105,7 +109,7 @@ static unsigned char hsm_find_path(sm_t *me,
 	}
 
 	/* (d) check source->super==target */
-	if( me->temp == path[0] )
+	if (me->temp == path[0])
 	{
 		SM_EXIT(me, s);
 		goto hsm_find_path_end;
@@ -121,10 +125,10 @@ static unsigned char hsm_find_path(sm_t *me,
 
 	/* find target->super->super... */
 	ret = SM_TRIG(me, path[1], SM_EMPTY_SIG);
-	while(SM_RET_SUPER == ret)
+	while (SM_RET_SUPER == ret)
 	{
 		path[++ip] = me->temp;
-		if(s == me->temp)
+		if (s == me->temp)
 		{
 			iq = 1;
 			SM_ASSERT(ip < SM_MAX_NEST_DEPTH);
@@ -139,7 +143,7 @@ static unsigned char hsm_find_path(sm_t *me,
 	}
 
 	/* the LCA not found yet? */
-	if(0 == iq)
+	if (0 == iq)
 	{
 		SM_ASSERT(ip < SM_MAX_NEST_DEPTH);
 
@@ -154,7 +158,7 @@ static unsigned char hsm_find_path(sm_t *me,
 		{
 			s = path[iq];
 			/* is this the LCA? */
-			if(t == s)
+			if (t == s)
 			{
 				ret = SM_RET_HANDLED;
 
@@ -165,10 +169,10 @@ static unsigned char hsm_find_path(sm_t *me,
 			{
 				iq--; /* try lower superstate of target */
 			}
-		}while(iq >= 0);
+		} while (iq >= 0);
 
-		 /* LCA not found? */
-		if( SM_RET_HANDLED != ret )
+		/* LCA not found? */
+		if (SM_RET_HANDLED != ret)
 		{
 			/* (g) check each source->super->...
 			 * for each target->super...
@@ -176,7 +180,7 @@ static unsigned char hsm_find_path(sm_t *me,
 			ret = SM_RET_IGNORE;
 			do
 			{
-				if(SM_RET_HANDLED  == SM_EXIT(me, t))
+				if (SM_RET_HANDLED == SM_EXIT(me, t))
 				{
 					SM_TRIG(me, t, SM_EMPTY_SIG);
 				}
@@ -185,9 +189,9 @@ static unsigned char hsm_find_path(sm_t *me,
 				do
 				{
 					s = path[iq];
-					if( t == s)
+					if (t == s)
 					{
-						ip = iq -1;
+						ip = iq - 1;
 						iq = -1;
 
 						ret = SM_RET_HANDLED; /* break */
@@ -196,8 +200,8 @@ static unsigned char hsm_find_path(sm_t *me,
 					{
 						iq--;
 					}
-				}while(iq >= 0);
-			}while(SM_RET_HANDLED != ret);
+				} while (iq >= 0);
+			} while (SM_RET_HANDLED != ret);
 		}
 	}
 
@@ -211,7 +215,7 @@ void hsm_ctor(sm_t *me, sm_state_handler_t init)
 	SM_ASSERT(0 != init);
 
 	me->state = hsm_top;
-	me->temp  = init;
+	me->temp = init;
 }
 void hsm_init(sm_t *me, sm_event_t *e)
 {
@@ -233,11 +237,11 @@ void hsm_init(sm_t *me, sm_event_t *e)
 		ip = 0;
 
 		path[0] = me->temp;
-		SM_TRIG(me, me->temp,SM_EMPTY_SIG);
-		while( t != me->temp )
+		SM_TRIG(me, me->temp, SM_EMPTY_SIG);
+		while (t != me->temp)
 		{
 			path[++ip] = me->temp;
-			SM_TRIG(me, me->temp,SM_EMPTY_SIG);
+			SM_TRIG(me, me->temp, SM_EMPTY_SIG);
 		}
 		me->temp = path[0];
 
@@ -246,15 +250,14 @@ void hsm_init(sm_t *me, sm_event_t *e)
 		do
 		{
 			SM_ENTRY(me, path[ip--]);
-		}while(ip >= 0);
+		} while (ip >= 0);
 
 		t = path[0];
-	}while(SM_RET_TRAN == SM_TRIG(me, t, SM_INIT_SIG));
+	} while (SM_RET_TRAN == SM_TRIG(me, t, SM_INIT_SIG));
 
 	me->temp = t;
 	me->state = me->temp;
 }
-
 
 void hsm_dispatch(sm_t *me, sm_event_t *e)
 {
@@ -271,27 +274,27 @@ void hsm_dispatch(sm_t *me, sm_event_t *e)
 	do
 	{
 		s = me->temp;
-		ret = s(me, e); 	// 调用状态处理函数
-		if(SM_RET_UNHANDLED == ret)
+		ret = s(me, e); // 调用状态处理函数
+		if (SM_RET_UNHANDLED == ret)
 		{
 			ret = SM_TRIG(me, s, SM_EMPTY_SIG);
 		}
-	}while(SM_RET_SUPER == ret);
+	} while (SM_RET_SUPER == ret);
 
 	// 如果发生状态转换
-	if(SM_RET_TRAN == ret)
+	if (SM_RET_TRAN == ret)
 	{
 		sm_state_handler_t path[SM_MAX_NEST_DEPTH];
 		signed char ip = -1;
 
-		path[0] = me->temp; 	// 状态转换的目的状态
-		path[1] = t; 			// 状态转换的源状态
+		path[0] = me->temp; // 状态转换的目的状态
+		path[1] = t;		// 状态转换的源状态
 
 		/* exit current state to transition source s... */
-		for( ; s != t; t = me->temp)
+		for (; s != t; t = me->temp)
 		{
 			ret = SM_EXIT(me, t);
-			if(SM_RET_HANDLED == ret)
+			if (SM_RET_HANDLED == ret)
 			{
 				SM_TRIG(me, t, SM_EMPTY_SIG);
 			}
@@ -299,7 +302,7 @@ void hsm_dispatch(sm_t *me, sm_event_t *e)
 
 		ip = hsm_find_path(me, path[0], s, path);
 
-		for(; ip>=0; ip--)
+		for (; ip >= 0; ip--)
 		{
 			SM_ENTRY(me, path[ip]);
 		}
@@ -308,13 +311,13 @@ void hsm_dispatch(sm_t *me, sm_event_t *e)
 		me->temp = t;
 
 		/* drill into the target hierarchy... */
-		while( SM_RET_TRAN == SM_TRIG(me, t, SM_INIT_SIG) )
+		while (SM_RET_TRAN == SM_TRIG(me, t, SM_INIT_SIG))
 		{
 			ip = 0;
 			path[0] = me->temp;
 
 			SM_TRIG(me, me->temp, SM_EMPTY_SIG);
-			while(t != me->temp)
+			while (t != me->temp)
 			{
 				path[++ip] = me->temp;
 				SM_TRIG(me, me->temp, SM_EMPTY_SIG);
@@ -326,11 +329,11 @@ void hsm_dispatch(sm_t *me, sm_event_t *e)
 			do
 			{
 				SM_ENTRY(me, path[ip--]);
-			}while(ip >= 0);
+			} while (ip >= 0);
 
 			t = path[0];
-		}// end: while( SM_RET_TRAN == SM_TRIG(me, t, SM_INIT_SIG) )
-	} // end: if(SM_RET_TRAN == ret)
+		} // end: while( SM_RET_TRAN == SM_TRIG(me, t, SM_INIT_SIG) )
+	}	  // end: if(SM_RET_TRAN == ret)
 
 	me->temp = t;
 	me->state = t;
